@@ -2,20 +2,21 @@ const axios = require('axios');
 const { createClient } = require('@supabase/supabase-js');
 const admin = require('firebase-admin');
 
-// 1. Inisialisasi Supabase (Menggunakan Environment Variables demi keamanan)
+// 1. Inisialisasi Supabase
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// 2. Inisialisasi Firebase Admin
-if (!admin.apps.length) {
-  try {
-    // Parse string JSON dari Environment Variable Vercel
-    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount)
-    });
-  } catch (error) {
+// 2. Inisialisasi Firebase Admin (Diperbarui agar aman di Vercel)
+try {
+  // Parse string JSON dari Environment Variable Vercel
+  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount)
+  });
+} catch (error) {
+  // Abaikan error jika Firebase sudah terinisialisasi sebelumnya (mencegah crash)
+  if (!/already exists/i.test(error.message)) {
     console.error('Gagal inisialisasi Firebase:', error);
   }
 }
@@ -39,7 +40,6 @@ module.exports = async (req, res) => {
       .single();
 
     if (fetchError && fetchError.code !== 'PGRST116') {
-      // PGRST116 adalah kode standar Supabase jika data tidak ditemukan (bukan error)
       throw fetchError;
     }
 
@@ -77,7 +77,7 @@ module.exports = async (req, res) => {
       topic: 'darurat_sumut',
       data: {
         type: 'gempa',
-        payload: JSON.stringify(payloadJson) // Payload ini yang akan disebar via P2P Offline
+        payload: JSON.stringify(payloadJson) 
       },
       notification: {
         title: `Peringatan Gempa M ${gempa.Magnitude}`,
