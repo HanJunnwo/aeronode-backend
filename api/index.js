@@ -1,24 +1,26 @@
 const axios = require('axios');
 const { createClient } = require('@supabase/supabase-js');
-const admin = require('firebase-admin');
+
+// Impor gaya Modular untuk Firebase (Standar terbaru)
+const { initializeApp, cert, getApps } = require('firebase-admin/app');
+const { getMessaging } = require('firebase-admin/messaging');
 
 // 1. Inisialisasi Supabase
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// 2. Inisialisasi Firebase Admin (Diperbarui agar aman di Vercel)
+// 2. Inisialisasi Firebase Admin
 try {
-  // Parse string JSON dari Environment Variable Vercel
-  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount)
-  });
-} catch (error) {
-  // Abaikan error jika Firebase sudah terinisialisasi sebelumnya (mencegah crash)
-  if (!/already exists/i.test(error.message)) {
-    console.error('Gagal inisialisasi Firebase:', error);
+  // Cek agar Firebase tidak diinisialisasi dua kali oleh Vercel
+  if (!getApps().length) {
+    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    initializeApp({
+      credential: cert(serviceAccount)
+    });
   }
+} catch (error) {
+  console.error('Gagal inisialisasi Firebase:', error);
 }
 
 // 3. Fungsi Utama (Serverless Function Vercel)
@@ -72,7 +74,7 @@ module.exports = async (req, res) => {
 
     if (insertError) throw insertError;
 
-    // D. Tembakkan Push Notification (FCM) ke Aplikasi Flutter
+    // D. Tembakkan Push Notification (FCM) menggunakan Modular API
     const message = {
       topic: 'darurat_sumut',
       data: {
@@ -85,7 +87,7 @@ module.exports = async (req, res) => {
       }
     };
 
-    await admin.messaging().send(message);
+    await getMessaging().send(message);
 
     // Respon sukses
     return res.status(200).json({ 
